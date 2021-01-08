@@ -7,6 +7,9 @@ import traceback
 import gym
 import numpy as np
 from PIL import Image
+import cv2
+import pybullet
+import pybullet_envs
 
 
 class DeepMindControl:
@@ -60,6 +63,41 @@ class DeepMindControl:
         if kwargs.get('mode', 'rgb_array') != 'rgb_array':
             raise ValueError("Only render mode 'rgb_array' is supported.")
         return self._env.physics.render(*self._size, camera_id=self._camera)
+
+
+class Bullet:
+    def __init__(self, env_name):
+        self.env = gym.make(env_name)
+        self.action_space = self.env.action_space
+        self.observation_space = gym.spaces.Dict({"image": gym.spaces.Box(0, 255, (64, 64, 3), dtype=np.uint8)})
+        self.steps_ctn = 0
+
+    def step(self, action):
+        reward = 0
+        for _ in range(2):
+            _, r, done, info = self.env.step(action)
+            self.steps_ctn += 1
+            observation = self.env.render("rgb_array")
+            observation = cv2.resize(observation, (64, 64), interpolation=cv2.INTER_LINEAR)
+            reward += r
+            if self.steps_ctn >= 1000:
+                done = True
+                observation = {"image": observation}
+                return observation, reward, done, info
+        observation = {"image": observation}
+
+        return observation, reward, done, info
+
+    def reset(self):
+        _ = self.env.reset()
+        observation = self.env.render("rgb_array")
+        observation = cv2.resize(observation, (64, 64), interpolation=cv2.INTER_LINEAR)
+        observation = {"image": observation}
+        self.steps_ctn = 0
+        return observation
+
+    def render(self, mode='human'):
+        return self.env.render(mode)
 
 
 class Atari:
